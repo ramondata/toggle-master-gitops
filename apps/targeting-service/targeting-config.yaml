@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: targeting-service-config
+  namespace: toggle-master
+data:
+  PORT: "8003"
+  POSTGRES_DB: "targeting_db"
+  POSTGRES_USER: "targeting_user"

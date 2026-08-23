@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: targeting-service
+  namespace: toggle-master
+  labels:
+    app: targeting-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: targeting-service
+  template:
+    metadata:
+      labels:
+        app: targeting-service
+    spec:
+      containers:
+      - name: targeting-service
+        image: 581571885952.dkr.ecr.us-east-1.amazonaws.com/toggle-master/targeting-service:v1.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8003
+        
+        envFrom:
+        - configMapRef:
+            name: targeting-service-config
+        
+        env:
+        - name: DATABASE_URL
+          value: "postgres://targeting_user:targeting_password@targeting-db.cahgwak00ah1.us-east-1.rds.amazonaws.com:5432/targeting_db"
+        - name: PORT
+          value: "8003"
+        - name: AUTH_SERVICE_URL
+          value: "http://auth-service:8001"
+
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8003
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8003
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 2
+        
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi

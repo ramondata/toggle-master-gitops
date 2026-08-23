@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: auth-system-quota
+  namespace: toggle-master
+spec:
+  hard:
+    # CPU total que o namespace pode usar
+    requests.cpu: "4"      
+    limits.cpu: "6"
+    
+    # Memória total que o namespace pode usar
+    requests.memory: "4Gi"   
+    limits.memory: "9Gi"     
+    
+    # Quantidade máxima de Pods
+    pods: "18"             
+    
+    # PersistentVolumeClaims
+    persistentvolumeclaims: "0"  #não estou usando

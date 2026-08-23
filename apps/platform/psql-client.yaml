@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: psql-client-secrets
+  namespace: toggle-master
+type: Opaque
+stringData:
+  AUTH_DB_PASSWORD: "auth_password"
+  FLAG_DB_PASSWORD: "flag_password"
+  TARGETING_DB_PASSWORD: "targeting_password"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: psql-client
+  namespace: toggle-master
+spec:
+  restartPolicy: Never
+  containers:
+    - name: psql-client
+      image: postgres:16
+      command: ["sleep", "3600"]
+
+      env:
+        - name: AUTH_DB_HOST
+          value: "auth-db.cahgwak00ah1.us-east-1.rds.amazonaws.com"
+        - name: FLAG_DB_HOST
+          value: "flag-db.cahgwak00ah1.us-east-1.rds.amazonaws.com"
+        - name: TARGETING_DB_HOST
+          value: "targeting-db.cahgwak00ah1.us-east-1.rds.amazonaws.com"
+
+        - name: AUTH_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: psql-client-secrets
+              key: AUTH_DB_PASSWORD
+        - name: FLAG_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: psql-client-secrets
+              key: FLAG_DB_PASSWORD
+        - name: TARGETING_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: psql-client-secrets
+              key: TARGETING_DB_PASSWORD
+
+      resources:
+        requests:
+          cpu: "50m"
+          memory: "128Mi"
+        limits:
+          cpu: "200m"
+          memory: "256Mi"

@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: toggle-master
+  labels:
+    app: auth-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      containers:
+      - name: auth-service
+        image: 581571885952.dkr.ecr.us-east-1.amazonaws.com/toggle-master/auth-service:v1.1
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8001
+        
+        envFrom:
+        - configMapRef:
+            name: auth-service-config
+        
+        env:
+        - name: MASTER_KEY
+          valueFrom:
+            secretKeyRef:
+              name: auth-service-secrets
+              key: master-key
+        
+        - name: DATABASE_URL
+          value: "postgres://auth_user:auth_password@auth-db.cahgwak00ah1.us-east-1.rds.amazonaws.com:5432/auth_db?sslmode=require"
+        
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 2
+        
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
