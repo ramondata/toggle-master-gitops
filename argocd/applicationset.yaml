@@ -1,0 +1,52 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: toggle-master-services
+  namespace: argocd
+
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+
+  generators:
+    - list:
+        elements:
+          - service: auth-service
+          # - service: flags-service
+          # - service: targeting-service
+          # - service: evaluation-service
+          # - service: analytics-service
+
+  template:
+    metadata:
+      name: "{{.service}}"
+      namespace: argocd
+
+    spec:
+      project: default
+
+      source:
+        repoURL: https://github.com/ramondata/toggle-master-gitops.git
+        targetRevision: main
+        path: "apps/{{.service}}"
+
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: toggle-master
+
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+
+        syncOptions:
+          - CreateNamespace=true
+          - PruneLast=true
+
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
