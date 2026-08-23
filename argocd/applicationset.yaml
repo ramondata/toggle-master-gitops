@@ -28,7 +28,7 @@ spec:
 
       source:
         repoURL: https://github.com/ramondata/toggle-master-gitops.git
-        targetRevision: main
+        targetRevision: master
         path: "apps/{{.service}}"
 
       destination:
