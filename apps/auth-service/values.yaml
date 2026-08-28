@@ -2,7 +2,7 @@ replicaCount: 2
 
 image:
   repository: 581571885952.dkr.ecr.us-east-1.amazonaws.com/toggle-master/auth-service
-  tag: v1.0.0-1bf28c9
+  tag: v1.0.0-4e6fc75
   pullPolicy: IfNotPresent
 
 service:
