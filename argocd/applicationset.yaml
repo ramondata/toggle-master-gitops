@@ -14,7 +14,7 @@ spec:
         elements:
           - service: platform
           - service: auth-service
-          - service: flags-service
+          - service: flag-service
           - service: targeting-service
           - service: evaluation-service
           - service: analytics-service
