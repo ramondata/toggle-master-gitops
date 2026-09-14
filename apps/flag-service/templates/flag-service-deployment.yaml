@@ -1,61 +1,72 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: flag-service
-  namespace: toggle-master
+  name: {{ .Values.name }}
+  namespace: {{ .Values.namespace }}
   labels:
-    app: flag-service
+    app: {{ .Values.name }}
+
 spec:
-  replicas: 2
+  replicas: {{ .Values.replicaCount }}
+
   selector:
     matchLabels:
-      app: flag-service
+      app: {{ .Values.name }}
+
   template:
     metadata:
       labels:
-        app: flag-service
+        app: {{ .Values.name }}
+
     spec:
       containers:
-      - name: flag-service
-        image: 581571885952.dkr.ecr.us-east-1.amazonaws.com/toggle-master/flag-service:v1.0
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 8002
-        
-        envFrom:
-        - configMapRef:
-            name: flag-service-config
-        
-        env:
-        - name: DATABASE_URL
-          value: "postgres://flag_user:flag_password@flag-db.cahgwak00ah1.us-east-1.rds.amazonaws.com:5432/flags_db"
-        - name:  AUTH_SERVICE_URL 
-          value: "http://auth-service:8001"
-        - name: PORT
-          value: "8002"
+        - name: {{ .Values.name }}
 
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8002
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
-        
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 8002
-          initialDelaySeconds: 5
-          periodSeconds: 5
-          timeoutSeconds: 5
-          failureThreshold: 2
-        
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-          limits:
-            cpu: 500m
-            memory: 512Mi
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+          ports:
+            - containerPort: {{ .Values.service.port }}
+
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.configMap.name }}
+
+          env:
+            - name: DATABASE_URL
+              value: {{ .Values.env.databaseUrl | quote }}
+
+            - name: PORT
+              value: {{ .Values.env.port | quote }}
+
+            - name: AUTH_SERVICE_URL
+              value: {{ .Values.env.authServiceUrl | quote }}
+
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.livenessProbe.path }}
+              port: {{ .Values.service.port }}
+
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.readinessProbe.path }}
+              port: {{ .Values.service.port }}
+
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+
+          resources:
+            requests:
+              cpu: {{ .Values.resources.requests.cpu | quote }}
+              memory: {{ .Values.resources.requests.memory | quote }}
+
+            limits:
+              cpu: {{ .Values.resources.limits.cpu | quote }}
+              memory: {{ .Values.resources.limits.memory | quote }}
