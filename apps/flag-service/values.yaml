@@ -15,7 +15,7 @@ configMap:
   name: flag-service-config
 
 env:
-  databaseUrl: "postgresql://teste:12345678@dev-flag-service-database.cahgwak00ah1.us-east-1.rds.amazonaws.com:5432/flags_db"
+  databaseUrl: "postgresql://teste:12345667@dev-flag-service-database.cahgwak00ah1.us-east-1.rds.amazonaws.com:5432/flag_db?sslmode=require"
   port: "8002"
   authServiceUrl: "http://auth-service:8001"
 
