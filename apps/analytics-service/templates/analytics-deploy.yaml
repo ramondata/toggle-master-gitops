@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
       - name: analytics-service
-        image: 581571885952.dkr.ecr.us-east-1.amazonaws.com/toggle-master/analytics-service:v1.0
-        imagePullPolicy: IfNotPresent
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
         ports:
         - containerPort: 8005
         
