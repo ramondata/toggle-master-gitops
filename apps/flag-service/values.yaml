@@ -3,8 +3,8 @@ name: flag-service
 replicaCount: 2
 
 image:
-  repository: 581571885952.dkr.ecr.us-east-1.amazonaws.com/toggle-master/flag-service
-  tag: 1.0.0-79f65c3
+  repository: 570763223269.dkr.ecr.us-east-1.amazonaws.com/toggle-master/flag-service
+  tag: v1.0.0-d79d4cc
   pullPolicy: IfNotPresent
 
 
