@@ -5,8 +5,8 @@ namespace: toggle-master
 replicaCount: 2
 
 image:
-  repository: 581571885952.dkr.ecr.us-east-1.amazonaws.com/toggle-master/targeting-service
-  tag: v1.0
+  repository: 570763223269.dkr.ecr.us-east-1.amazonaws.com/toggle-master/targeting-service
+  tag: v1.0.0-5fb9f17
   pullPolicy: IfNotPresent
 
 service:
