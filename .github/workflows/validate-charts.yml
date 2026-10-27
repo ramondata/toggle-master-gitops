@@ -1,0 +1,40 @@
+name: Validate microservice Helm charts
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Helm validation | ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - auth-service
+          - flag-service
+          - targeting-service
+          - evaluation-service
+          - analytics-service
+    env:
+      SERVICE: ${{ matrix.service }}
+      IMAGE_REPOSITORY: 111122223333.dkr.ecr.us-east-1.amazonaws.com/toggle-master/${{ matrix.service }}
+      IMAGE_TAG: ci-validation
+    steps:
+      - uses: actions/checkout@v6
+      - uses: azure/setup-helm@v4
+      - name: Lint Helm chart
+        run: helm lint "apps/$SERVICE"
+      - name: Render chart and verify published image inputs
+        run: |
+          helm template "$SERVICE" "apps/$SERVICE" \
+            --namespace toggle-master \
+            --set-string "image.repository=$IMAGE_REPOSITORY" \
+            --set-string "image.tag=$IMAGE_TAG" > rendered.yaml
+          grep -Fq "${IMAGE_REPOSITORY}:${IMAGE_TAG}" rendered.yaml
