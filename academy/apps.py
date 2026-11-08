@@ -46,8 +46,11 @@ def services(ref, account, region, config_revision, aws_revision):
         {"name": "hpa.maxReplicas", "value": "2"},
     ]}
     app["spec"]["ignoreDifferences"] = [
+        {"group": "apps", "kind": "Deployment", "namespace": "toggle-master",
+         "jsonPointers": ["/spec/template/metadata/annotations/kubectl.kubernetes.io~1restartedAt"]},
+    ] + [
         {"group": "apps", "kind": "Deployment", "name": name, "namespace": "toggle-master",
-         "jsonPointers": ["/spec/replicas"] + (["/spec/template/metadata/annotations/kubectl.kubernetes.io~1restartedAt"] if name == "evaluation-service" else [])}
+         "jsonPointers": ["/spec/replicas"]}
         for name in ("evaluation-service", "analytics-service")
     ]
     return {

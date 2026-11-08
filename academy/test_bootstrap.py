@@ -13,9 +13,36 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import apps
 import runtime
+import capacity
 
 
 class BootstrapTests(unittest.TestCase):
+    def test_capacity_reserves_slots_and_only_moves_our_deployments(self):
+        condition = {"type": "Ready", "status": "True"}
+        nodes = [{"metadata": {"name": name}, "status": {"allocatable": {"pods": str(size)}, "conditions": [condition]}}
+                 for name, size in (("full", 3), ("free", 6), ("reserved", 3))]
+        def pod(name, node, ns="kube-system", labels=None, owner=None):
+            return {"metadata": {"name": name, "namespace": ns, "labels": labels or {}, "ownerReferences": owner or []},
+                    "spec": {"nodeName": node}, "status": {"phase": "Running", "conditions": [condition]}}
+        app = pod("auth", "full", "toggle-master", owner=[{"kind": "ReplicaSet", "name": "auth-rs"}])
+        pods = [app, pod("exporter", "full", "observability", {"app.kubernetes.io/name": "prometheus-node-exporter"}),
+                pod("system", "full"), pod("system", "free"), pod("system", "reserved")]
+        rs = [{"metadata": {"name": "auth-rs", "namespace": "toggle-master", "ownerReferences": [{"kind": "Deployment", "name": "auth-service"}]}}]
+        move = capacity.next_move(nodes, pods, rs)
+        self.assertEqual(move["deployment"], "auth-service")
+        self.assertEqual(set(move["hold"]), {"full", "reserved"})
+        app["spec"]["nodeName"] = "free"
+        self.assertIsNone(capacity.next_move(nodes, pods, rs))
+        app["spec"]["nodeName"] = "full"
+        rs[0]["metadata"]["ownerReferences"][0]["name"] = "unrelated-project"
+        with self.assertRaises(RuntimeError):
+            capacity.next_move(nodes, pods, rs)
+
+    def test_capacity_preserves_existing_cordon(self):
+        node = {"metadata": {"name": "maintenance"}, "spec": {"unschedulable": True},
+                "status": {"allocatable": {"pods": "1"}, "conditions": [{"type": "Ready", "status": "True"}]}}
+        self.assertIsNone(capacity.next_move([node], [], []))
+
     def test_expired_or_incomplete_session_never_reaches_secret(self):
         now = datetime.now(timezone.utc)
         valid = {"AccessKeyId": "test-key", "SecretAccessKey": "test-secret", "SessionToken": "test-token",

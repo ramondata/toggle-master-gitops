@@ -75,6 +75,10 @@ metricas dos cinco servicos e logs. Nao injeta falha automaticamente.
 - Instala Argo CD `v3.5.2` se estiver ausente. Reaproveita instalacoes existentes
   e prepara o `argocd-server` com TLS e Service LoadBalancer.
 - Instala Metrics Server como add-on EKS compativel, somente se estiver ausente.
+- Reserva as vagas dos DaemonSets de metricas/logs. Se um no antigo estiver
+  lotado, usa cordon temporario e rollout de Deployments conhecidos do projeto
+  para mover a replica a outro no. Restaura apenas os cordons que ele mesmo
+  fez, inclusive em erro; nao apaga pods de outros projetos nem usa drain.
 - Prepara `academy-databases`, `academy-runtime`, `fase4-demo`,
   `fase4-integrations` e `grafana-admin` no cluster.
 - Registra Applications no Argo CD para Prometheus/Grafana, Loki/Collectors,

@@ -11,7 +11,12 @@ export PATH="$HOME/.local/bin:$PATH"
 REF="${GITOPS_REF:-master}"
 ARGO_VERSION="${ARGOCD_VERSION:-v3.5.2}"
 WORK="$(mktemp -d)"
-trap 'rm -rf -- "$WORK"' EXIT
+held_nodes=()
+cleanup() {
+  for node in "${held_nodes[@]}"; do kubectl uncordon "$node" || true; done
+  rm -rf -- "$WORK"
+}
+trap cleanup EXIT
 mode="${1:-help}"
 services=(auth-service flag-service targeting-service evaluation-service analytics-service)
 
@@ -140,6 +145,31 @@ ensure_argo() {
   kubectl -n argocd rollout status statefulset/argocd-application-controller --timeout=300s
 }
 
+reserve_agent_slots() {
+  local move namespace deployment node strategy
+  for ((attempt=0;attempt<15;attempt++)); do
+    kubectl get nodes -o json > "$WORK/nodes.json"
+    kubectl get pods -A -o json > "$WORK/pods.json"
+    kubectl get replicasets -A -o json > "$WORK/rs.json"
+    move="$(python3 "$ROOT/academy/capacity.py" "$WORK/nodes.json" "$WORK/pods.json" "$WORK/rs.json")"
+    if [[ "$move" == null ]]; then return; fi
+    namespace="$(jq -r .namespace <<< "$move")"
+    deployment="$(jq -r .deployment <<< "$move")"
+    strategy="$(kubectl -n "$namespace" get deployment "$deployment" -o jsonpath='{.spec.strategy.type}')"
+    [[ "$strategy" == RollingUpdate ]] || { echo 'Redistribuicao exige RollingUpdate; nenhum pod foi excluido.' >&2; return 1; }
+    while IFS= read -r node; do
+      held_nodes+=("$node")
+      kubectl cordon "$node"
+    done < <(jq -r '.hold[]' <<< "$move")
+    printf 'Liberando vaga para agentes: redistribuindo %s/%s por rollout.\n' "$namespace" "$deployment"
+    kubectl -n "$namespace" rollout restart "deployment/$deployment"
+    kubectl -n "$namespace" rollout status "deployment/$deployment" --timeout=300s
+    for node in "${held_nodes[@]}"; do kubectl uncordon "$node"; done
+    held_nodes=()
+  done
+  echo 'Limite de redistribuicoes atingido; confira status e a capacidade do node group.' >&2; return 1
+}
+
 ensure_metrics_server() {
   local version status
   if ! kubectl -n kube-system get deployment metrics-server >/dev/null 2>&1; then
@@ -263,6 +293,13 @@ case "$mode" in
     python3 "$ROOT/academy/runtime.py" configure
     python3 "$ROOT/academy/runtime.py" runtime
     python3 "$ROOT/academy/runtime.py" integrations
+    # Reduz as replicas anteriores e prepara os bancos antes de reservar
+    # uma vaga por no para cada DaemonSet novo.
+    apply_services
+    wait_app platform
+    init_db
+    for service in "${services[@]}"; do wait_app "$service"; kubectl -n toggle-master rollout status "deployment/$service" --timeout=300s; done
+    reserve_agent_slots
     host="$(kubectl -n observability get service grafana --ignore-not-found -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
     host="${host:-grafana-lab.invalid}"
     tls_secret "$host"
@@ -274,9 +311,8 @@ case "$mode" in
     wait_app observability-metrics
     python3 "$ROOT/academy/apps.py" telemetry --ref "$REF" --cluster "$TARGET_CLUSTER" --new-relic-region "${NEW_RELIC_REGION:-US}" | kubectl apply -f -
     wait_app observability-telemetry
-    apply_services
-    wait_app platform
-    init_db
+    # Carrega a configuracao OTel tambem em pods de uma instalacao antiga.
+    kubectl -n toggle-master rollout restart deployment/auth-service deployment/flag-service deployment/targeting-service deployment/evaluation-service deployment/analytics-service
     for service in "${services[@]}"; do wait_app "$service"; kubectl -n toggle-master rollout status "deployment/$service" --timeout=300s; done
     # Atualiza os processos que leem Secrets por env, inclusive uma instalacao anterior.
     kubectl -n observability rollout restart deployment/grafana deployment/otel-gateway deployment/self-healer
