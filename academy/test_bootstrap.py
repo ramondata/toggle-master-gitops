@@ -122,6 +122,7 @@ class BootstrapTests(unittest.TestCase):
                "sync": {"status": "Synced", "comparedTo": {"source": copy.deepcopy(source)}},
                "operationState": {"phase": "Succeeded", "syncResult": {"source": copy.deepcopy(source)}}}}
         self.assertTrue(apps.ready(app))
+        self.assertFalse(apps.ready(app, aws_revision="new-session"))
         stale = copy.deepcopy(app)
         stale["spec"]["source"]["helm"]["valuesObject"]["clusterName"] = "new-cluster"
         self.assertFalse(apps.ready(stale))

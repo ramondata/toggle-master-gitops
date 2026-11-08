@@ -65,8 +65,13 @@ def services(ref, account, region, config_revision, aws_revision):
     }
 
 
-def ready(app):
+def ready(app, config_revision=None, aws_revision=None):
     source = app.get("spec", {}).get("source")
+    parameters = {p["name"]: p["value"] for p in (source or {}).get("helm", {}).get("parameters", [])}
+    if config_revision is not None and parameters.get("academyConfigRevision") != config_revision:
+        return False
+    if aws_revision is not None and parameters.get("academyAwsRevision") != aws_revision:
+        return False
     status = app.get("status", {})
     sync = status.get("sync", {})
     operation = status.get("operationState", {})
@@ -91,7 +96,9 @@ def main():
     args = parser.parse_args()
     if args.mode == "ready":
         import sys
-        sys.exit(0 if ready(json.load(sys.stdin)) else 1)
+        config = None if args.config_revision == "initial" else args.config_revision
+        aws = None if args.aws_revision == "initial" else args.aws_revision
+        sys.exit(0 if ready(json.load(sys.stdin), config, aws) else 1)
     if args.mode == "services":
         if not re.fullmatch(r"\d{12}", args.account):
             parser.error("AWS account deve ter 12 digitos")

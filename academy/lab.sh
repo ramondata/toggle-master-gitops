@@ -72,10 +72,20 @@ diagnose() {
 }
 
 wait_app() {
-  local name="$1" remaining
+  local name="$1" remaining refreshed=false previous_reconcile
+  local expected=()
+  if [[ "$name" == platform || "$name" == *-service ]]; then
+    expected=(--config-revision "$CONFIG_REVISION" --aws-revision "$AWS_REVISION")
+  fi
   for ((remaining=0;remaining<150;remaining++)); do
-    if kubectl -n argocd get application "$name" -o json > "$WORK/app.json" 2>/dev/null &&
-       python3 "$ROOT/academy/apps.py" ready < "$WORK/app.json"; then return; fi
+    if kubectl -n argocd get application "$name" -o json > "$WORK/app.json" 2>/dev/null; then
+      if [[ "$refreshed" == false ]]; then
+        previous_reconcile="$(jq -r '.status.reconciledAt // ""' "$WORK/app.json")"
+        kubectl -n argocd annotate application "$name" argocd.argoproj.io/refresh=hard --overwrite >/dev/null
+        refreshed=true
+      elif [[ "$(jq -r '.status.reconciledAt // ""' "$WORK/app.json")" != "$previous_reconcile" ]] &&
+           python3 "$ROOT/academy/apps.py" ready "${expected[@]}" < "$WORK/app.json"; then return; fi
+    fi
     if (( remaining % 6 == 0 )); then
       printf 'Aguardando Argo CD: %s\n' "$name"
       kubectl -n argocd get application "$name" --ignore-not-found || true
@@ -231,11 +241,10 @@ check_ownership() {
 }
 
 apply_services() {
-  local config_revision aws_revision
-  config_revision="$(kubectl -n toggle-master get secret academy-databases -o jsonpath='{.metadata.resourceVersion}')"
-  aws_revision="$(kubectl -n toggle-master get secret academy-runtime -o jsonpath='{.metadata.resourceVersion}')"
+  CONFIG_REVISION="$(kubectl -n toggle-master get secret academy-databases -o jsonpath='{.metadata.resourceVersion}')"
+  AWS_REVISION="$(kubectl -n toggle-master get secret academy-runtime -o jsonpath='{.metadata.resourceVersion}')"
   python3 "$ROOT/academy/apps.py" services --ref "$REF" --account "$ACCOUNT" --region "$TARGET_REGION" \
-    --config-revision "$config_revision" --aws-revision "$aws_revision" | kubectl apply -f -
+    --config-revision "$CONFIG_REVISION" --aws-revision "$AWS_REVISION" | kubectl apply -f -
 }
 
 wait_lb() {
