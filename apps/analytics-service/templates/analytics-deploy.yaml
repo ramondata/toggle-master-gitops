@@ -6,7 +6,7 @@ metadata:
   labels:
     app: analytics-service
 spec:
-  replicas: 2
+  replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
       app: analytics-service

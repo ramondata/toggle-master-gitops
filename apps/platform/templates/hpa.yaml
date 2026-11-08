@@ -9,7 +9,7 @@ spec:
     kind: Deployment
     name: evaluation-service
   minReplicas: 1
-  maxReplicas: 5
+  maxReplicas: {{ .Values.hpa.maxReplicas }}
   metrics:
     - type: Resource
       resource:
@@ -29,7 +29,7 @@ spec:
     kind: Deployment
     name: analytics-service
   minReplicas: 1
-  maxReplicas: 5
+  maxReplicas: {{ .Values.hpa.maxReplicas }}
   metrics:
     - type: Resource
       resource:

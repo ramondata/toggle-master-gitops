@@ -10,7 +10,7 @@ region="${TARGET_REGION:-us-east-1}"
 work_dir="$(mktemp -d)"
 trap 'rm -rf -- "$work_dir"' EXIT
 aws sts get-caller-identity --no-cli-pager >/dev/null
-aws eks describe-cluster --name toggle-cluster --region "$region" --query cluster.status --output text >/dev/null
+aws eks describe-cluster --name "${TARGET_CLUSTER:-toggle-cluster}" --region "$region" --query cluster.status --output text >/dev/null
 if ! gh auth status >/dev/null 2>&1; then
   gh auth login --hostname github.com --git-protocol https --web
 fi
@@ -39,14 +39,21 @@ for service in auth-service flag-service targeting-service evaluation-service an
   aws ecr describe-repositories --region "$region" --repository-names "toggle-master/$service" >/dev/null
   gh secret set AWS_ACADEMY_CREDENTIALS --repo "ramondata/$service" < "$work_dir/academy.ini"
 done
+run_services=()
+run_ids=()
 for service in auth-service flag-service targeting-service evaluation-service analytics-service; do
   # Rerun do push existente funciona mesmo quando workflow_dispatch nao esta na branch default.
   run_id="$(gh run list --repo "ramondata/$service" --branch aws-cloud-k8s --event push --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
   [[ -n "$run_id" ]] || { printf 'Nenhuma execucao push encontrada para %s.\n' "$service"; exit 2; }
+  run_services+=("$service")
+  run_ids+=("$run_id")
   status="$(gh run view "$run_id" --repo "ramondata/$service" --json status --jq .status)"
   conclusion="$(gh run view "$run_id" --repo "ramondata/$service" --json conclusion --jq .conclusion)"
   if [[ "$status" != completed ]]; then
     printf '%s ainda esta executando; reexecute este script apos a conclusao se a publicacao falhar.\n' "$service"
+  elif [[ "${FORCE_REPUBLISH:-false}" == true ]]; then
+    gh run rerun "$run_id" --repo "ramondata/$service"
+    printf 'Publicacao completa reacionada: https://github.com/ramondata/%s/actions/runs/%s\n' "$service" "$run_id"
   elif [[ "$conclusion" == success ]]; then
     printf 'Ultima publicacao de %s ja terminou com sucesso.\n' "$service"
   else
@@ -54,4 +61,9 @@ for service in auth-service flag-service targeting-service evaluation-service an
     printf 'Esteira reacionada: https://github.com/ramondata/%s/actions/runs/%s\n' "$service" "$run_id"
   fi
 done
+if [[ "${WAIT_FOR_CI:-false}" == true ]]; then
+  for index in "${!run_ids[@]}"; do
+    gh run watch "${run_ids[$index]}" --repo "ramondata/${run_services[$index]}" --exit-status --interval 10
+  done
+fi
 printf 'Credenciais atualizadas. Acompanhe as esteiras: build, scan, push ECR e update GitOps.\n'

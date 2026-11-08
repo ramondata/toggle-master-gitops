@@ -1,5 +1,23 @@
 # toggle-master-gitops
 
+## Fase 4 — instalacao no AWS Academy
+
+O caminho de entrega e **AWS real / EKS**. No CloudShell, apos criar/recuperar
+a infraestrutura pelo Terraform e publicar as imagens:
+
+```bash
+git pull --ff-only
+bash academy/lab.sh up
+bash academy/lab.sh passwords
+bash academy/lab.sh verify
+```
+
+Para renovar a sessao dos pods sem reinstalar: `bash academy/lab.sh refresh`.
+O [guia AWS Academy](academy/README.md) inclui publicacao, configuracao inicial,
+credenciais, capacidade dos nos, URLs e demonstracao.
+O laboratorio em `local/` e apenas uma referencia de desenvolvimento e nao e o
+ambiente de entrega da fase 4.
+
 GitOps do ToggleMaster. O ApplicationSet em `argocd/applicationset.yaml`
 acompanha `master` e inclui platform, auth-service, flag-service,
 targeting-service, evaluation-service e analytics-service.

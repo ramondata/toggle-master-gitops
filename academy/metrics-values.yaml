@@ -1,0 +1,35 @@
+# HTTPS termina no proprio Grafana; nao depende de Ingress Controller.
+publicScheme: https
+publicIngress: false
+monitoring:
+  grafana:
+    service:
+      type: LoadBalancer
+      port: 443
+      targetPort: 3000
+      annotations:
+        service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+    env:
+      GF_SERVER_PROTOCOL: https
+      GF_SERVER_CERT_FILE: /etc/grafana-tls/tls.crt
+      GF_SERVER_CERT_KEY: /etc/grafana-tls/tls.key
+      GF_SERVER_CERTS_WATCH_INTERVAL: 5s
+    extraSecretMounts:
+      - name: grafana-tls
+        secretName: grafana-tls
+        mountPath: /etc/grafana-tls
+        readOnly: true
+    readinessProbe:
+      httpGet:
+        scheme: HTTPS
+    livenessProbe:
+      httpGet:
+        scheme: HTTPS
+    sidecar:
+      skipTlsVerify: true
+      datasources:
+        reloadURL: https://localhost:3000/api/admin/provisioning/datasources/reload
+      dashboards:
+        reloadURL: https://localhost:3000/api/admin/provisioning/dashboards/reload
+      alerts:
+        reloadURL: https://localhost:3000/api/admin/provisioning/alerting/reload

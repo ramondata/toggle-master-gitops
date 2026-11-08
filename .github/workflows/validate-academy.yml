@@ -1,0 +1,78 @@
+name: Validate AWS Academy bootstrap
+on:
+  pull_request:
+    paths: [academy/**, scripts/**, apps/**, .github/workflows/validate-academy.yml]
+  push:
+    branches: [master]
+    paths: [academy/**, scripts/**, apps/**, .github/workflows/validate-academy.yml]
+permissions:
+  contents: read
+jobs:
+  bootstrap:
+    name: Validate Academy scripts and Grafana HTTPS
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.19.0
+      - uses: azure/setup-kubectl@v4
+        with:
+          version: v1.36.4
+      - name: Validate scripts and configuration contracts
+        run: |
+          for script in academy/*.sh; do bash -n "$script"; done
+          shellcheck --severity=warning academy/*.sh scripts/fase4-refresh-ci.sh
+          python -m unittest discover -s academy -p 'test_*.py' -v
+          python -m pip install PyYAML==6.0.2
+      - name: Resolve dependencies and validate EKS render
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm dependency build apps/observability-metrics
+          helm lint apps/observability-metrics --strict -f academy/metrics-values.yaml --set-string publicHost=grafana.example.test
+          helm template observability-metrics apps/observability-metrics --namespace observability --kube-version 1.36.0 \
+            -f academy/metrics-values.yaml --set-string publicHost=grafana.example.test > /tmp/academy.yaml
+          python academy/assert_render.py /tmp/academy.yaml
+          helm template platform apps/platform --namespace toggle-master --set serviceIngressEnabled=false --set hpa.maxReplicas=2 > /tmp/platform.yaml
+          if grep -q '^kind: Ingress' /tmp/platform.yaml; then exit 1; fi
+          grep -q 'maxReplicas: 2' /tmp/platform.yaml
+      - name: Create disposable Kubernetes cluster for HTTPS integration
+        run: |
+          curl -fsSL https://kind.sigs.k8s.io/dl/v0.33.0/kind-linux-amd64 -o /tmp/kind
+          chmod +x /tmp/kind
+          /tmp/kind create cluster --name academy-test --image kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed --wait 180s
+          kubectl create namespace observability
+          printf admin > /tmp/admin-user
+          printf ci-only-password > /tmp/admin-password
+          kubectl -n observability create secret generic grafana-admin --from-file=admin-user=/tmp/admin-user --from-file=admin-password=/tmp/admin-password
+          openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 1 -subj /CN=grafana.example.test \
+            -addext subjectAltName=DNS:grafana.example.test -keyout /tmp/tls.key -out /tmp/tls.crt
+          kubectl -n observability create secret tls grafana-tls --cert=/tmp/tls.crt --key=/tmp/tls.key
+      - name: Verify real HTTPS health and dashboard provisioning
+        run: |
+          helm upgrade --install observability-metrics apps/observability-metrics --namespace observability \
+            -f academy/metrics-values.yaml --set-string publicHost=grafana.example.test \
+            --set monitoring.grafana.service.type=ClusterIP --wait --timeout 10m
+          kubectl -n observability port-forward service/grafana 3443:443 >/tmp/port-forward.log 2>&1 &
+          for i in {1..30}; do
+            if curl -fsS --cacert /tmp/tls.crt --resolve grafana.example.test:3443:127.0.0.1 \
+                https://grafana.example.test:3443/api/health >/tmp/health.json; then break; fi
+            sleep 2
+          done
+          jq -e '.database == "ok"' /tmp/health.json
+          for i in {1..30}; do
+            if curl -fsS --cacert /tmp/tls.crt --resolve grafana.example.test:3443:127.0.0.1 \
+              --user admin:ci-only-password https://grafana.example.test:3443/api/dashboards/uid/togglemaster-fase4 >/tmp/dashboard.json; then break; fi
+            sleep 2
+          done
+          jq -e '.dashboard.uid == "togglemaster-fase4"' /tmp/dashboard.json
+      - name: Diagnostics
+        if: failure()
+        run: |
+          kubectl get pods -A -o wide || true
+          kubectl -n observability describe deployment grafana || true
+          kubectl -n observability logs deployment/grafana --all-containers --tail=40 || true

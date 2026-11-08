@@ -7,5 +7,5 @@ data:
   PORT: "8004"
   FLAG_SERVICE_URL: "http://flag-service:8002"
   TARGETING_SERVICE_URL: "http://targeting-service:8003"
-  AWS_REGION: "us-east-1"
+  AWS_REGION: {{ .Values.awsRegion | default "us-east-1" | quote }}
 

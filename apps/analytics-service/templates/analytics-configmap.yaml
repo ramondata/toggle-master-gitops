@@ -5,4 +5,4 @@ metadata:
   namespace: toggle-master
 data:
   PORT: "8005"
-  AWS_REGION: "us-east-1"
+  AWS_REGION: {{ .Values.awsRegion | default "us-east-1" | quote }}

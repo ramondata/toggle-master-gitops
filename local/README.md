@@ -1,3 +1,8 @@
+# Ambiente de desenvolvimento historico
+
+Para a entrega da Fase 4 use o [bootstrap AWS Academy/EKS](../academy/README.md).
+Este laboratorio local nao atende a exigencia de cloud gerenciada do trabalho.
+
 # Fase 4 local: Floci + Kubernetes
 
 Este ambiente nao usa a conta AWS nem consome creditos Academy. Usa Kubernetes
@@ -120,3 +125,4 @@ Depois de validar, grave dashboard, logs, trace e Service Map; injete uma falha 
 mostre alerta, incidente/chat, restart automatico e recuperacao. Finalize o PDF
 com integrantes, links, arquitetura, justificativas e evidencias. O video tem
 limite de 25 minutos conforme o enunciado.
+
