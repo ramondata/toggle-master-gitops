@@ -146,7 +146,7 @@ ensure_argo() {
 }
 
 reserve_agent_slots() {
-  local move namespace deployment node strategy
+  local move namespace deployment node strategy old_pod remaining
   for ((attempt=0;attempt<15;attempt++)); do
     kubectl get nodes -o json > "$WORK/nodes.json"
     kubectl get pods -A -o json > "$WORK/pods.json"
@@ -164,6 +164,13 @@ reserve_agent_slots() {
     printf 'Liberando vaga para agentes: redistribuindo %s/%s por rollout.\n' "$namespace" "$deployment"
     kubectl -n "$namespace" rollout restart "deployment/$deployment"
     kubectl -n "$namespace" rollout status "deployment/$deployment" --timeout=300s
+    # Available nao implica que o pod antigo ja liberou a vaga no scheduler.
+    old_pod="$(jq -r .pod <<< "$move")"
+    for ((remaining=0;remaining<60;remaining++)); do
+      if [[ -z "$(kubectl -n "$namespace" get pod "$old_pod" --ignore-not-found -o name)" ]]; then break; fi
+      sleep 2
+    done
+    (( remaining < 60 )) || { echo 'O pod anterior ainda nao liberou a vaga; confira status.' >&2; return 1; }
     for node in "${held_nodes[@]}"; do kubectl uncordon "$node"; done
     held_nodes=()
   done

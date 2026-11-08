@@ -45,7 +45,7 @@ def next_move(nodes, pods, replicasets):
             deployment = deployments.get((ns, owner["name"])) if owner else None
             if deployment not in OWNED.get(ns, set()):
                 continue
-            return {"node": name, "namespace": ns, "deployment": deployment,
+            return {"node": name, "namespace": ns, "deployment": deployment, "pod": meta["name"],
                     "hold": [n for n, values in slots.items() if n == name or values[0] <= values[1]]}
         raise RuntimeError("No " + name + " lotado sem Deployment do projeto para redistribuir. Confira status; nao foram excluidos pods.")
     return None
