@@ -29,6 +29,8 @@ Uso: bash academy/lab.sh COMANDO
   status         Mostra contexto, Applications, pods e enderecos.
   passwords      Mostra as senhas somente neste terminal.
   verify         Testa o fluxo real AWS, metricas e logs (sem injetar falha).
+  finish         Verifica a base e testa falha/alerta/restart/HTTP 200 no EKS.
+  healer-logs    Mostra o log do runbook no EKS para a gravacao.
   integrations   Troca as chaves New Relic/PagerDuty/Discord com entrada oculta.
   databases      Corrige URLs RDS com entrada oculta; preserva chaves de servico.
   demo start|logs|fail|recover|status
@@ -37,7 +39,7 @@ TEXT
 }
 
 if [[ "$mode" == help || "$mode" == --help || "$mode" == -h ]]; then usage; exit; fi
-case "$mode" in up|refresh|publish|status|passwords|verify|integrations|databases|demo) ;; *) usage >&2; exit 2 ;; esac
+case "$mode" in up|refresh|publish|status|passwords|verify|finish|healer-logs|integrations|databases|demo) ;; *) usage >&2; exit 2 ;; esac
 for dependency in aws kubectl jq python3 curl openssl git; do
   command -v "$dependency" >/dev/null || { printf 'Comando ausente: %s. Use o AWS CloudShell.\n' "$dependency" >&2; exit 2; }
 done
@@ -389,5 +391,7 @@ PY
     python3 "$ROOT/scripts/fase4-smoke.py"
     bash "$ROOT/scripts/fase4-verify.sh"
     ;;
+  finish) python3 "$ROOT/academy/finish.py" ;;
+  healer-logs) kubectl -n observability logs deployment/self-healer --tail=60 ;;
   demo) bash "$ROOT/scripts/fase4-demo.sh" "${2:-status}" ;;
 esac
