@@ -1,5 +1,11 @@
 # Fase 4 no AWS Academy / EKS
 
+Para fechar a entrega, execute `bash academy/lab.sh finish` no EKS instalado.
+O comando injeta uma falha controlada e verifica o ciclo automatico, salvando
+um resumo privado. Confirme tambem as telas comerciais. Use o
+[roteiro de gravacao AWS](../docs/fase4/06-gravacao-aws.md) e o
+[modelo do relatorio](../docs/fase4/07-modelo-relatorio.md).
+
 Este e o caminho de entrega. O bootstrap usa AWS real: EKS, ECR, RDS,
 ElastiCache, SQS e DynamoDB. Os manifests locais nao sao usados.
 
