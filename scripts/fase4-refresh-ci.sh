@@ -31,8 +31,10 @@ for source in keys.values():
         raise SystemExit('Sessao temporaria incompleta; renove o lab.')
 if data.get('Expiration'):
     expiry=datetime.datetime.fromisoformat(data['Expiration'].replace('Z','+00:00'))
-    if (expiry-datetime.datetime.now(datetime.timezone.utc)).total_seconds()<1200:
-        raise SystemExit('Renove a sessao: faltam menos de 20 minutos para expirar.')
+    remaining=int((expiry-datetime.datetime.now(datetime.timezone.utc)).total_seconds())
+    print(f'Sessao AWS: {remaining//60} minutos restantes.', flush=True)
+    if remaining<600:
+        raise SystemExit('Renove a sessao: faltam menos de 10 minutos para expirar.')
 (root/'academy.ini').write_text('[default]\n'+''.join(k+'='+data[v]+'\n' for k,v in keys.items()))
 PY
 for service in auth-service flag-service targeting-service evaluation-service analytics-service; do
