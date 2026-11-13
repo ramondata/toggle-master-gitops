@@ -37,6 +37,8 @@ if data.get('Expiration'):
 PY
 for service in auth-service flag-service targeting-service evaluation-service analytics-service; do
   aws ecr describe-repositories --region "$region" --repository-names "toggle-master/$service" >/dev/null
+  # Os workflows usam vars.AWS_REGION; atualizar antes de reexecutar em outra regiao.
+  gh variable set AWS_REGION --repo "ramondata/$service" --body "$region"
   gh secret set AWS_ACADEMY_CREDENTIALS --repo "ramondata/$service" < "$work_dir/academy.ini"
 done
 run_services=()
