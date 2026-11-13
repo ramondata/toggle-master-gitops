@@ -1,5 +1,22 @@
 # Fase 4 no AWS Academy / EKS
 
+## Conta pessoal Sunlit Servers (172346499417, Ohio)
+
+Use TARGET_REGION=us-east-2 e o ambiente env/personal do Terraform.
+Nesta conta, evaluation e analytics usam EKS Pod Identity em vez de copiar
+as credenciais temporarias do CloudShell para os pods. Aplique primeiro a
+configuracao atualizada do Terraform (addon, roles e associacoes).
+Publique a versao de analytics com Boto3 compativel e execute up novamente.
+O bootstrap valida as associacoes, remove chaves estaticas do academy-runtime
+e usa ServiceAccounts exclusivas para esses dois servicos. As credenciais
+dos pods sao renovadas automaticamente pelo EKS e pelo SDK.
+
+O CI continua usando a sessao CloudShell temporaria durante publish.
+Em contas Academy, o modo session permanece como padrao; AWS_AUTH_MODE pode
+selecionar explicitamente session ou pod-identity. Nao configure um modo
+Pod Identity sem ter criado addon/roles/associacoes compatíveis.
+
+
 Para fechar a entrega, execute `bash academy/lab.sh finish` no EKS instalado.
 O comando injeta uma falha controlada e verifica o ciclo automatico, salvando
 um resumo privado. Confirme tambem as telas comerciais. Use o

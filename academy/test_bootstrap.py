@@ -120,6 +120,53 @@ class BootstrapTests(unittest.TestCase):
                 self.assertEqual(actual[key], current[key])
             self.assertNotIn("AWS_ENDPOINT_URL", actual)
 
+    def test_personal_pod_identity_removes_old_keys_without_exporting_session(self):
+        current = {"AWS_SQS_URL": "https://sqs.us-east-1.amazonaws.com/172346499417/project",
+                   "AWS_DYNAMODB_TABLE": "dev-dynamodb", "REDIS_URL": "redis://redis.example.cache.amazonaws.com:6379",
+                   "AWS_ACCESS_KEY_ID": "old-key", "AWS_SECRET_ACCESS_KEY": "old-secret", "AWS_SESSION_TOKEN": "expired"}
+        def fake_aws(*args):
+            if args[:2] == ("sts", "get-caller-identity"):
+                return {"Account": "172346499417"}
+            if args[:2] == ("eks", "describe-addon"):
+                return {"addon": {"status": "ACTIVE"}}
+            if args[:2] == ("eks", "list-pod-identity-associations"):
+                return {"associations": [{"namespace": "toggle-master", "serviceAccount": service, "associationId": service}
+                                         for service in ("evaluation-service", "analytics-service")]}
+            if args[:2] == ("eks", "describe-pod-identity-association"):
+                return {"association": {"roleArn": "arn:aws:iam::172346499417:role/toggle-cluster-" + args[-1] + "-aws"}}
+            if args[:2] == ("dynamodb", "describe-table"):
+                return {"Table": {"KeySchema": [{"AttributeName": "event_id", "KeyType": "HASH"}]}}
+            raise AssertionError("Unexpected AWS call; credentials must not be exported: " + str(args[:2]))
+        with patch.dict(runtime.os.environ, {}, clear=True), patch.object(runtime, "get_secret", return_value=current), \
+             patch.object(runtime, "aws", side_effect=fake_aws), patch.object(runtime, "put_secret") as put:
+            runtime.configure_runtime()
+            actual = put.call_args.args[2]
+            self.assertEqual(actual["AWS_AUTH_MODE"], "pod-identity")
+            for key in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"):
+                self.assertNotIn(key, actual)
+            self.assertEqual(actual["AWS_SQS_URL"], current["AWS_SQS_URL"])
+
+    def test_missing_pod_identity_does_not_fall_back_to_expiring_keys(self):
+        with patch.dict(runtime.os.environ, {}, clear=True), patch.object(runtime, "aws", return_value={"addon": {"status": "CREATING"}}):
+            with self.assertRaises(runtime.ConfigurationError):
+                runtime.pod_identity_session({"Account": "172346499417"})
+
+    def test_pod_identity_role_must_match_our_service(self):
+        def fake_aws(*args):
+            if args[:2] == ("eks", "describe-addon"):
+                return {"addon": {"status": "ACTIVE"}}
+            if args[:2] == ("eks", "list-pod-identity-associations"):
+                return {"associations": [{"namespace": "toggle-master", "serviceAccount": "evaluation-service", "associationId": "a"}]}
+            return {"association": {"roleArn": "arn:aws:iam::172346499417:role/unrelated"}}
+        with patch.dict(runtime.os.environ, {}, clear=True), patch.object(runtime, "aws", side_effect=fake_aws):
+            with self.assertRaises(runtime.ConfigurationError):
+                runtime.pod_identity_session({"Account": "172346499417"})
+
+    def test_pod_identity_is_explicit_in_appset(self):
+        obj = apps.services("master", "172346499417", "us-east-2", "cfg", "aws", "pod-identity")
+        params = obj["spec"]["template"]["spec"]["source"]["helm"]["parameters"]
+        self.assertIn({"name": "awsPodIdentityEnabled", "value": "true"}, params)
+
     def test_applicationset_keeps_hpa_and_restart_exceptions(self):
         obj = apps.services("master", "111122223333", "us-east-1", "cfg", "aws")
         template = obj["spec"]["template"]["spec"]

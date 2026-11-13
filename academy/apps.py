@@ -32,7 +32,7 @@ def application(name, ref, namespace, values=None, parameters=None, value_files=
     }
 
 
-def services(ref, account, region, config_revision, aws_revision):
+def services(ref, account, region, config_revision, aws_revision, aws_auth_mode="session"):
     app = application("placeholder", ref, "toggle-master")
     source = app["spec"]["source"]
     source["path"] = "apps/{{.service}}"
@@ -40,6 +40,7 @@ def services(ref, account, region, config_revision, aws_revision):
         {"name": "image.repository", "value": "{{.repository}}"},
         {"name": "replicaCount", "value": "1"},
         {"name": "awsRegion", "value": region},
+        {"name": "awsPodIdentityEnabled", "value": "true" if aws_auth_mode == "pod-identity" else "false"},
         {"name": "academyConfigRevision", "value": config_revision, "forceString": True},
         {"name": "academyAwsRevision", "value": aws_revision, "forceString": True},
         {"name": "serviceIngressEnabled", "value": "false"},
@@ -92,6 +93,7 @@ def main():
     parser.add_argument("--host", default="grafana-lab.invalid")
     parser.add_argument("--config-revision", default="initial")
     parser.add_argument("--aws-revision", default="initial")
+    parser.add_argument("--aws-auth-mode", choices=["session", "pod-identity"], default="session")
     parser.add_argument("--new-relic-region", choices=["US", "EU"], default="US")
     args = parser.parse_args()
     if args.mode == "ready":
@@ -102,7 +104,7 @@ def main():
     if args.mode == "services":
         if not re.fullmatch(r"\d{12}", args.account):
             parser.error("AWS account deve ter 12 digitos")
-        result = services(args.ref, args.account, args.region, args.config_revision, args.aws_revision)
+        result = services(args.ref, args.account, args.region, args.config_revision, args.aws_revision, args.aws_auth_mode)
     elif args.mode == "metrics":
         result = application("observability-metrics", args.ref, "observability", values={
             "publicHost": args.host,

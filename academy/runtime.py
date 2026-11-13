@@ -135,10 +135,33 @@ def database_values(existing, instances, password=None):
     return output
 
 
+def pod_identity_session(identity):
+    mode = os.getenv("AWS_AUTH_MODE") or ("pod-identity" if identity["Account"] == "172346499417" else "session")
+    if mode == "session":
+        return session_values(aws("configure", "export-credentials", "--format", "process")), mode
+    if mode != "pod-identity":
+        raise ConfigurationError("AWS_AUTH_MODE deve ser session ou pod-identity.")
+    addon = aws("eks", "describe-addon", "--cluster-name", CLUSTER, "--addon-name", "eks-pod-identity-agent")["addon"]
+    if addon.get("status") != "ACTIVE":
+        raise ConfigurationError("Pod Identity Agent precisa estar ACTIVE. Aplique o Terraform pessoal antes de up.")
+    associations = aws("eks", "list-pod-identity-associations", "--cluster-name", CLUSTER).get("associations", [])
+    for service in ("evaluation-service", "analytics-service"):
+        matches = [a for a in associations if a.get("namespace") == "toggle-master" and a.get("serviceAccount") == service]
+        if len(matches) != 1:
+            raise ConfigurationError("Associacao Pod Identity ausente/ambigua para " + service + ". Aplique o Terraform pessoal.")
+        association = aws("eks", "describe-pod-identity-association", "--cluster-name", CLUSTER,
+                          "--association-id", matches[0]["associationId"])["association"]
+        expected = f'arn:aws:iam::{identity["Account"]}:role/{CLUSTER}-{service}-aws'
+        if association.get("roleArn") != expected:
+            raise ConfigurationError("Role Pod Identity diferente da role esperada para " + service + ".")
+    # Sem AccessKey/Secret/SessionToken: o SDK deve usar o endpoint injetado pelo EKS.
+    return {}, mode
+
+
 def configure_runtime():
     current = get_secret("toggle-master", "academy-runtime")
-    session = session_values(aws("configure", "export-credentials", "--format", "process"))
     identity = aws("sts", "get-caller-identity")
+    session, auth_mode = pod_identity_session(identity)
     queue = os.getenv("AWS_SQS_URL") or current.get("AWS_SQS_URL")
     if not queue:
         name = os.getenv("SQS_QUEUE_NAME")
@@ -178,7 +201,7 @@ def configure_runtime():
     if urlsplit(redis).scheme not in ("redis", "rediss"):
         raise ConfigurationError("REDIS_URL precisa usar redis:// ou rediss://.")
     # Substitui o conjunto completo: nunca carrega AWS_ENDPOINT_URL de um emulador.
-    values = dict(session, AWS_REGION=REGION, AWS_DEFAULT_REGION=REGION,
+    values = dict(session, AWS_AUTH_MODE=auth_mode, AWS_REGION=REGION, AWS_DEFAULT_REGION=REGION,
                   AWS_EC2_METADATA_DISABLED="true", AWS_SQS_URL=queue,
                   AWS_DYNAMODB_TABLE=table, REDIS_URL=redis)
     if current.get("AWS_ENDPOINT_URL"):
