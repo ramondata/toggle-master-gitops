@@ -11,7 +11,10 @@ O bootstrap valida as associacoes, remove chaves estaticas do academy-runtime
 e usa ServiceAccounts exclusivas para esses dois servicos. As credenciais
 dos pods sao renovadas automaticamente pelo EKS e pelo SDK.
 
-O CI continua usando a sessao CloudShell temporaria durante publish.
+O CI usa uma sessao STS de uma hora da role toggle-cluster-ci-publisher,
+restrita aos cinco repositorios ECR. Aplique essa role pelo Terraform pessoal
+antes de publish. O CloudShell apenas inicia AssumeRole enquanto sua sessao
+ainda esta valida; nenhuma chave permanente e criada.
 Em contas Academy, o modo session permanece como padrao; AWS_AUTH_MODE pode
 selecionar explicitamente session ou pod-identity. Nao configure um modo
 Pod Identity sem ter criado addon/roles/associacoes compatíveis.
