@@ -9,14 +9,22 @@ done
 region="${TARGET_REGION:-us-east-1}"
 work_dir="$(mktemp -d)"
 trap 'rm -rf -- "$work_dir"' EXIT
-aws sts get-caller-identity --no-cli-pager >/dev/null
+account="$(aws sts get-caller-identity --region "$region" --query Account --output text --no-cli-pager)"
 aws eks describe-cluster --name "${TARGET_CLUSTER:-toggle-cluster}" --region "$region" --query cluster.status --output text >/dev/null
 if ! gh auth status >/dev/null 2>&1; then
   gh auth login --hostname github.com --git-protocol https --web
 fi
 login="$(gh api user --jq .login)"
 [[ "$login" == ramondata ]] || { echo 'Use a conta GitHub ramondata para atualizar estes repositorios.'; exit 2; }
-aws configure export-credentials --format process > "$work_dir/credentials.json"
+if [[ "$account" == 172346499417 ]]; then
+  echo 'Preparando sessao de uma hora com permissoes limitadas ao ECR do projeto...'
+  aws sts assume-role --region "$region" \
+    --role-arn "arn:aws:iam::$account:role/${TARGET_CLUSTER:-toggle-cluster}-ci-publisher" \
+    --role-session-name toggle-github-publish --duration-seconds 3600 \
+    --query Credentials --output json > "$work_dir/credentials.json"
+else
+  aws configure export-credentials --format process > "$work_dir/credentials.json"
+fi
 python3 - "$work_dir" <<'PY'
 import datetime
 import json
