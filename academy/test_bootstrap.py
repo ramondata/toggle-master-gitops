@@ -52,6 +52,18 @@ class BootstrapTests(unittest.TestCase):
             with self.assertRaises(runtime.ConfigurationError):
                 runtime.session_values(dict(valid, **change), now)
 
+    def test_short_aws_session_uses_same_ten_minute_floor_as_publisher(self):
+        now = datetime(2026, 11, 13, tzinfo=timezone.utc)
+        credentials = {"AccessKeyId": "test-key", "SecretAccessKey": "test-secret", "SessionToken": "test-token"}
+        for minutes in (10, 14):
+            valid = dict(credentials, Expiration=(now + timedelta(minutes=minutes)).isoformat())
+            self.assertEqual(runtime.session_values(valid, now)["AWS_SESSION_TOKEN"], "test-token")
+        for minutes in (-1, 0, 6):
+            short = dict(credentials, Expiration=(now + timedelta(minutes=minutes)).isoformat())
+            with self.assertRaises(runtime.ConfigurationError) as error:
+                runtime.session_values(short, now)
+            self.assertNotIn("test-secret", str(error.exception))
+
     def test_urls_cannot_use_local_emulator(self):
         for url in ("postgresql://u:p@localhost/auth_db", "postgresql://u:p@floci:4566/auth_db",
                     "http://u:p@db.rds.amazonaws.com/auth_db"):
