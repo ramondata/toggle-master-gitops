@@ -71,8 +71,8 @@ def session_values(data, now=None):
             remaining = (datetime.fromisoformat(expiry.replace("Z", "+00:00")) - (now or datetime.now(timezone.utc))).total_seconds()
         except (ValueError, TypeError):
             raise ConfigurationError("Expiration invalida na sessao AWS.") from None
-        if remaining < 1200:
-            raise ConfigurationError("Renove a sessao Academy: faltam menos de 20 minutos para expirar.")
+        if remaining < 600:
+            raise ConfigurationError(f"Sessao AWS com {int(remaining // 60)} minutos restantes; minimo necessario: 10. Renove a sessao antes de continuar.")
     return {dest: data[source] for dest, source in fields.items()}
 
 
