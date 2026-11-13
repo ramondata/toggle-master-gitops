@@ -38,3 +38,10 @@ jobs:
             --set-string "image.repository=$IMAGE_REPOSITORY" \
             --set-string "image.tag=$IMAGE_TAG" > rendered.yaml
           grep -Fq "${IMAGE_REPOSITORY}:${IMAGE_TAG}" rendered.yaml
+      - name: Verify Pod Identity service account
+        if: matrix.service == 'evaluation-service' || matrix.service == 'analytics-service'
+        run: |
+          helm template "$SERVICE" "apps/$SERVICE" --namespace toggle-master \
+            --set awsPodIdentityEnabled=true > pod-identity.yaml
+          grep -Fxq 'kind: ServiceAccount' pod-identity.yaml
+          grep -Fq "serviceAccountName: $SERVICE" pod-identity.yaml

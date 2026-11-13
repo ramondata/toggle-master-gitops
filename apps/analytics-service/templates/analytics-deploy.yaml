@@ -18,6 +18,9 @@ spec:
       labels:
         app: analytics-service
     spec:
+      {{- if .Values.awsPodIdentityEnabled }}
+      serviceAccountName: analytics-service
+      {{- end }}
       containers:
       - name: analytics-service
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"

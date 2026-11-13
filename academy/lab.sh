@@ -245,8 +245,10 @@ check_ownership() {
 apply_services() {
   CONFIG_REVISION="$(kubectl -n toggle-master get secret academy-databases -o jsonpath='{.metadata.resourceVersion}')"
   AWS_REVISION="$(kubectl -n toggle-master get secret academy-runtime -o jsonpath='{.metadata.resourceVersion}')"
+  AWS_AUTH_MODE="$(kubectl -n toggle-master get secret academy-runtime -o jsonpath='{.data.AWS_AUTH_MODE}' | base64 -d)"
+  AWS_AUTH_MODE="${AWS_AUTH_MODE:-session}"
   python3 "$ROOT/academy/apps.py" services --ref "$REF" --account "$ACCOUNT" --region "$TARGET_REGION" \
-    --config-revision "$CONFIG_REVISION" --aws-revision "$AWS_REVISION" | kubectl apply -f -
+    --config-revision "$CONFIG_REVISION" --aws-revision "$AWS_REVISION" --aws-auth-mode "$AWS_AUTH_MODE" | kubectl apply -f -
 }
 
 wait_lb() {
@@ -347,7 +349,7 @@ case "$mode" in
     python3 "$ROOT/academy/runtime.py" runtime
     apply_services
     for service in evaluation-service analytics-service; do wait_app "$service"; kubectl -n toggle-master rollout status "deployment/$service" --timeout=300s; done
-    echo 'Sessao dos pods renovada. Para renovar tambem o CI, use publish.'
+    echo "Configuracao AWS conferida (modo: $AWS_AUTH_MODE). Em Pod Identity, o EKS renova as credenciais; publish renova apenas o CI."
     ;;
   publish)
     if ! command -v gh >/dev/null; then bash "$ROOT/academy/install-gh.sh"; fi

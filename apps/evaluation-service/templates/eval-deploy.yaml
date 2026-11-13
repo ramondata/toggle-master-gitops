@@ -23,6 +23,9 @@ spec:
         app: {{ .Values.app.name }}
 
     spec:
+      {{- if .Values.awsPodIdentityEnabled }}
+      serviceAccountName: evaluation-service
+      {{- end }}
       containers:
         - name: {{ .Values.app.name }}
 
