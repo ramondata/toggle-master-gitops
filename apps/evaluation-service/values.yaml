@@ -6,8 +6,8 @@ namespace: toggle-master
 replicaCount: 2
 
 image:
-  repository: 570763223269.dkr.ecr.us-east-1.amazonaws.com/toggle-master/evaluation-service
-  tag: v1.0.0-0b48184
+  repository: 172346499417.dkr.ecr.us-east-2.amazonaws.com/toggle-master/evaluation-service
+  tag: v1.0.0-75fa876
   pullPolicy: IfNotPresent
 
 service:
