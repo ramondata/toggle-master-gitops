@@ -26,7 +26,8 @@ def emit(event, **fields):
 def request_json(url, body, headers=None, context=None, method='POST'):
     data = json.dumps(body).encode()
     req = urllib.request.Request(url, data=data, method=method,
-                                 headers={'Content-Type': 'application/json', **(headers or {})})
+                                 headers={'Content-Type': 'application/json',
+                                          'User-Agent': 'ToggleMaster/1.0', **(headers or {})})
     with urllib.request.urlopen(req, timeout=8, context=context) as response:
         return response.status
 
@@ -72,8 +73,11 @@ def notify(status, outcome='pending'):
                 code = request_json(url, body)
                 emit('notification_sent', integration=name, status=status, http_status=code)
                 break
-            except (OSError, ValueError):
-                emit('notification_failed', integration=name, attempt=attempt + 1)
+            except (OSError, ValueError) as exc:
+                # Nao registrar URL, corpo ou texto da excecao: podem conter tokens.
+                emit('notification_failed', integration=name, status=status, attempt=attempt + 1,
+                     http_status=exc.code if isinstance(exc, urllib.error.HTTPError) else None,
+                     error_type=type(exc).__name__)
                 if attempt < 2:
                     time.sleep(1)
 
